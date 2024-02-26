@@ -313,13 +313,17 @@ def main():
             for name, values in metrics.items():
                 logger.scalar(name, np.array(values, np.float64).mean())
                 metrics[name].clear()
-            logger.add(
-                agnt.report(
-                    next(report_dataset),
-                    control_input,
-                ),
-                prefix="train",
-            )
+            # NOTE: I think this next block tries to create a video from world model
+            # reconstructions, which fails because it assumes 3 channels
+            # The culprit seems to be agent.py:video_pred which calls agent.py:destandardize
+            # which seems to hardcode 3 channels
+            # logger.add(
+            #     agnt.report(
+            #         next(report_dataset),
+            #         control_input,
+            #     ),
+            #     prefix="train",
+            # )
             logger.write(fps=True)
 
     # 9-2. Register helper function to train_driver
