@@ -14,6 +14,7 @@ from hydra import compose, initialize
 from omegaconf import OmegaConf
 from pc_rl.envs.wrappers.continuous_task_wrapper import ContinuousTaskWrapper
 from tqdm import tqdm
+import wandb
 
 try:
     import rich.traceback
@@ -51,6 +52,24 @@ def main():
     logdir = pathlib.Path(config.logdir).expanduser()
     logdir.mkdir(parents=True, exist_ok=True)
     config.save(logdir / "config.yaml")
+
+    with initialize(version_base=None, config_path="../conf"):
+        # use value of task defined on command line to override env config
+        pcrl_cfg = compose(config_name="train", overrides=[f"env={config.task}"])
+        pcrl_cfg = OmegaConf.to_container(pcrl_cfg, resolve=True, throw_on_missing=True)
+
+    pcrl_cfg["model"] = {"name": "MV-MWM"}
+    wandb_cfg = pcrl_cfg.pop("wandb")
+    env_cfg = pcrl_cfg["env"]
+    wandb.init(
+        project="MV-MWM",
+        config=pcrl_cfg,
+        sync_tensorboard=True,  # auto-upload any values logged to tensorboard
+        save_code=True,  # save script used to start training, git commit, and patch
+        reinit=True,  # required for hydra sweeps with default launcher
+        tags=wandb_cfg["tags"],
+        notes=wandb_cfg["notes"],
+    )
 
     print(config, "\n")
     print("Logdir", logdir)
@@ -127,12 +146,6 @@ def main():
 
     ###### [4] Create Environment ######
     # 4-1. Create Env Factory
-    with initialize(version_base=None, config_path="../conf/env"):
-        # use value of task defined on command line to load hydra config
-        # TODO override env resolution with config from this script
-        env_cfg = compose(config_name=config.task)
-        env_cfg = OmegaConf.to_container(env_cfg, resolve=True, throw_on_missing=True)
-
     def make_env(mode, actions_min_max=None):
         assert actions_min_max is None
 
@@ -355,6 +368,8 @@ def main():
             env.close()
         except Exception:
             pass
+
+    wandb.finish()
 
 
 # Helper function executed after episode ends

@@ -1,0 +1,6 @@
+defaults:
+  - env: "???"
+
+wandb:
+  notes: null
+  tags: null
