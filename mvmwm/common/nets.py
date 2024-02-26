@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras import layers as tfkl
 from tensorflow.keras import initializers as tfki
 from tensorflow_probability import distributions as tfd
-from tensorflow.keras.mixed_precision import experimental as prec
+from tensorflow.keras import mixed_precision
 
 import common
 
@@ -35,10 +35,10 @@ class RSSM(common.Module):
         self._std_act = std_act
         self._min_std = min_std
         self._cell = GRUCell(self._deter, norm=True)
-        self._cast = lambda x: tf.cast(x, prec.global_policy().compute_dtype)
+        self._cast = lambda x: tf.cast(x, mixed_precision.global_policy().compute_dtype)
 
     def initial(self, batch_size):
-        dtype = prec.global_policy().compute_dtype
+        dtype = mixed_precision.global_policy().compute_dtype
         if self._discrete:
             state = dict(
                 logit=tf.zeros([batch_size, self._stoch, self._discrete], dtype),
@@ -181,7 +181,7 @@ class MLP(common.Module):
         self._out = out
 
     def __call__(self, features):
-        x = tf.cast(features, prec.global_policy().compute_dtype)
+        x = tf.cast(features, mixed_precision.global_policy().compute_dtype)
         x = x.reshape([-1, x.shape[-1]])
         for index, unit in enumerate(self._layers):
             x = self.get(f"dense{index}", tfkl.Dense, unit)(x)
@@ -325,7 +325,7 @@ class MLPEncoder(common.Module):
 
     @tf.function
     def __call__(self, x, training=False):
-        x = x.astype(prec.global_policy().compute_dtype)
+        x = x.astype(mixed_precision.global_policy().compute_dtype)
         if self._batchnorm:
             x = self.get(f"batchnorm", tfkl.BatchNormalization)(x, training=training)
         for i, unit in enumerate(self._layers):
@@ -348,7 +348,7 @@ class CNNEncoder(common.Module):
 
     @tf.function
     def __call__(self, x):
-        x = x.astype(prec.global_policy().compute_dtype)
+        x = x.astype(mixed_precision.global_policy().compute_dtype)
         for i, kernel in enumerate(self._cnn_kernels):
             depth = 2 ** i * self._cnn_depth
             x = self.get(f"conv{i}", tfkl.Conv2D, depth, kernel, 1)(x)
@@ -371,7 +371,7 @@ class CNNDecoder(common.Module):
 
     @tf.function
     def __call__(self, x):
-        x = x.astype(prec.global_policy().compute_dtype)
+        x = x.astype(mixed_precision.global_policy().compute_dtype)
 
         x = self.get("convin", tfkl.Dense, 2 * 2 * 2 * self._cnn_depth)(x)
         x = tf.reshape(x, [-1, 1, 1, 8 * self._cnn_depth])

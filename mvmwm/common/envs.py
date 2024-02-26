@@ -9,10 +9,12 @@ import signal
 
 import cloudpickle
 from functools import partial
-import gym
 import numpy as np
 
-from rlbench import RandomizeEvery
+try:
+    import gymnasium as gym
+except ImportError:
+    import gym
 
 try:
     from pyrep.errors import ConfigurationPathError, IKError
@@ -36,6 +38,7 @@ class RLBench:
         randomize_texture=False,
         default_texture="default",
     ):
+        from rlbench import RandomizeEvery
         from rlbench.action_modes.action_mode import MoveArmThenGripper
         from rlbench.action_modes.arm_action_modes import EndEffectorPoseViaPlanning
         from rlbench.action_modes.gripper_action_modes import Discrete

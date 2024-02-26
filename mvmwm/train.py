@@ -26,7 +26,7 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
 import numpy as np
 from keras import backend as K
-import ruamel.yaml as yaml
+from ruamel.yaml import YAML
 
 import agent as agent
 import common
@@ -35,9 +35,8 @@ import common
 def main():
 
     # Load YAML Configs
-    configs = yaml.safe_load(
-        (pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text()
-    )
+    yaml = YAML(typ="safe", pure=True)
+    configs = yaml.load((pathlib.Path(sys.argv[0]).parent / "configs.yaml").read_text())
     parsed, remaining = common.Flags(configs=["defaults"]).parse(known_only=True)
     config = common.Config(configs["defaults"])
     for name in parsed.configs:
@@ -61,9 +60,9 @@ def main():
         tf.config.experimental.set_memory_growth(gpu, True)
     assert config.precision in (16, 32), config.precision
     if config.precision == 16:
-        from tensorflow.keras.mixed_precision import experimental as prec
+        from tensorflow.keras import mixed_precision
 
-        prec.set_policy(prec.Policy("mixed_float16"))
+        mixed_precision.set_global_policy(mixed_precision.Policy("mixed_float16"))
 
     ###### [1] Set Cameras ######
     # 1-1. Additional cameras.
