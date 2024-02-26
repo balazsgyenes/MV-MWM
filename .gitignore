@@ -4,3 +4,9 @@ logs*
 environment.env
 *.ipynb
 .DS_Store
+
+# maniskill2 asset folder
+data
+
+# python editable installs
+*.egg-info/
