@@ -70,10 +70,11 @@ defaults:
 
   # World Model
   clip_rewards: identity
-  grad_heads: [reward, discount]
+  grad_heads: [reward, discount, state]
   pred_discount: True
   rssm: {action_free: False, hidden: 1024, deter: 1024, stoch: 32, discrete: 32, act: elu, norm: none, std_act: sigmoid2, min_std: 0.1}
   reward_head: {layers: [512, 512, 512, 512], act: elu, norm: none, dist: symlog}
+  state_head: {shape: [47], layers: [128], act: elu, norm: none, dist: symlog}
   discount_head: {layers: [512, 512, 512, 512], act: elu, norm: none, dist: binary}
   loss_scales: {feature: 1.0, kl: 1.0, reward: 1.0, discount: 1.0, proprio: 1.0, mae_reward: 1.0, wmbc: 1.0}
   wmkl: {scale: 1.0}

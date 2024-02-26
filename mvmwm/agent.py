@@ -48,6 +48,8 @@ class Agent(common.Module):
         mae_latent = tf.concat([mae_latent[:, 1:], mae_latent[:, :1]], axis=1)
         wm_latent = self.wm.wm_vit_encoder.forward_encoder(mae_latent)
         embed = wm_latent.mean(1)
+        env_state = tf.cast(obs["state"], prec.global_policy().compute_dtype)
+        embed = tf.concat([embed, env_state], axis=-1)
 
         # RSSM one step forward
         sample = mode == "train"
@@ -166,6 +168,7 @@ class WorldModel(common.Module):
         self.heads["reward"] = common.MLP([], **config.reward_head)
         if config.pred_discount:
             self.heads["discount"] = common.MLP([], **config.discount_head)
+        self.heads["state"] = common.MLP(**config.state_head)
         for name in config.grad_heads:
             assert name in self.heads, name
 
@@ -275,6 +278,8 @@ class WorldModel(common.Module):
         feature = tf.concat([feature[:, 1:], feature[:, :1]], axis=1)
         wm_latent = self.wm_vit_encoder.forward_encoder(feature)
         embed = wm_latent.mean(1).reshape([B, T, wm_latent.shape[-1]])
+        env_state = tf.cast(data["state"], prec.global_policy().compute_dtype)
+        embed = tf.concat([embed, env_state], axis=-1)
 
         # RSSM forward
         post, prior = self.rssm.observe(embed, data["action"], data["is_first"], state)
@@ -522,6 +527,8 @@ class WorldModel(common.Module):
         feature = tf.concat([feature[:, 1:], feature[:, :1]], axis=1)
         wm_latent = self.wm_vit_encoder.forward_encoder(feature)
         embed = wm_latent.mean(1).reshape([B, T, wm_latent.shape[-1]])
+        env_state = tf.cast(data["state"], prec.global_policy().compute_dtype)
+        embed = tf.concat([embed, env_state], axis=-1)
 
         # 2-2: Process these through RSSM
         states, _ = self.rssm.observe(
