@@ -113,8 +113,8 @@ class TensorBoardOutput:
                 tf.summary.image(name, value, step)
             elif len(value.shape) == 3:
                 tf.summary.image(name, value, step)
-            elif len(value.shape) == 4:
-                self._video_summary(name, value, step)
+            # elif len(value.shape) == 4:
+            #     self._video_summary(name, value, step)
         self._writer.flush()
 
     def _ensure_writer(self):
@@ -143,7 +143,7 @@ class TensorBoardOutput:
 
 
 def encode_gif(frames, fps):
-    from subprocess import Popen, PIPE
+    from subprocess import PIPE, Popen
 
     h, w, c = frames[0].shape
     pxfmt = {1: "gray", 3: "rgb24"}[c]

@@ -53,7 +53,7 @@ defaults:
 
   # MAE
   mask_ratio: 0.9
-  mae: {img_h_size: 96, img_w_size: 96, patch_size: 16, embed_dim: 256, depth: 8, num_heads: 4, decoder_embed_dim: 256, decoder_depth: 6, decoder_num_heads: 4, reward_pred: True, early_conv: True, in_chans: 3, ncams: 0, view_masking: 1, viewpoint_pos_emb: True}
+  mae: {img_h_size: 96, img_w_size: 96, patch_size: 16, embed_dim: 256, depth: 8, num_heads: 4, decoder_embed_dim: 256, decoder_depth: 6, decoder_num_heads: 4, reward_pred: True, early_conv: True, in_chans: 4, ncams: 0, view_masking: 1, viewpoint_pos_emb: True}
   wm_flat_vit: {img_h_size: 6, img_w_size: 6, patch_size: 1, embed_dim: 128, depth: 2, num_heads: 4, decoder_embed_dim: 128, decoder_depth: 2, decoder_num_heads: 4, in_chans: 256}
   image_t_size: 4
   # theta_low | theta_high | phi_low | phi_high | theta_delta | phi_delta | radius_low | radius_high | height_low | height_high | radius_delta | height_delta; All zeros means no camera
@@ -100,8 +100,8 @@ defaults:
   reward_norm: {momentum: 0.99, scale: 1.0, eps: 1e-8}
   
   # Behavior Cloning
-  demo_bc: True
-  bc_weight: 1.0
+  demo_bc: False
+  bc_weight: 0.0
 
 front:
   camera_keys: front

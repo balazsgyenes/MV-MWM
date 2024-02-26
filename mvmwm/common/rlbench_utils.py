@@ -2,11 +2,54 @@ import gc
 import random
 import re
 import copy
+
 import numpy as np
 from tqdm import tqdm
 
-
 THETA_LIMIT = 0.05
+
+
+def prefill_replay_buffer(
+    env,
+    replay,
+    num_demos,
+    camera_keys,
+    shaped_rewards=False,
+    demo_replay=None,
+    use_rotation=False,
+    additional_camera=False,
+    randomize=False,
+):
+    assert demo_replay is None
+    print("collecting demos.")
+    transitions = []
+    for _ in tqdm(range(num_demos)):
+
+        reset_obs = env.reset()
+        action = env.action_space.sample()
+        action[...] = 0
+        reset_obs["action"] = action
+        transitions.append(reset_obs)
+
+        done = False
+        while not done:
+            action = env.action_space.sample()
+            obs = env.step({"action": action})
+            done = obs["is_last"]
+            obs["action"] = action
+            obs["is_last"] = obs["is_terminal"] = False
+            transitions.append(obs)
+
+        assert len(transitions) % 50 == 1
+        transitions.pop()  # apparently this needs to have a multiple of 50 elements
+        transitions[-1]["is_last"] = True
+
+    for obs in transitions:
+        replay.add_step(obs)
+        if demo_replay is not None:
+            demo_replay.add_step(obs)
+
+    return (actions_min_max := None)
 
 
 def collect_demo(
@@ -266,9 +309,9 @@ def get_camera_keys(keys):
 
 def quat_to_theta(quat):
     x2, x3, x4, x1 = quat
-    theta1 = np.arccos(x1 / np.sqrt(x4 ** 2 + x3 ** 2 + x2 ** 2 + x1 ** 2))
-    theta2 = np.arccos(x2 / np.sqrt(x4 ** 2 + x3 ** 2 + x2 ** 2))
-    theta3 = np.arccos(x3 / np.sqrt(x4 ** 2 + x3 ** 2))
+    theta1 = np.arccos(x1 / np.sqrt(x4**2 + x3**2 + x2**2 + x1**2))
+    theta2 = np.arccos(x2 / np.sqrt(x4**2 + x3**2 + x2**2))
+    theta3 = np.arccos(x3 / np.sqrt(x4**2 + x3**2))
     if x4 < 0:
         theta3 = 2 * np.pi - theta3
     thetas = np.array([theta1, theta2, theta3])

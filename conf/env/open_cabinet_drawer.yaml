@@ -1,0 +1,12 @@
+defaults:
+  - maniskill2
+  - _self_
+
+name: OpenCabinetDrawer
+env_id: OpenCabinetDrawer-v2
+env_kwargs:
+  control_mode: base_pd_joint_vel_arm_pd_joint_delta_pos
+  camera_cfgs:
+    width: 96
+    height: 96
+    fov: 1.5

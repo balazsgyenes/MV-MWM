@@ -359,13 +359,83 @@ class RLBench:
 
     def quat_to_theta(self, quat):
         x2, x3, x4, x1 = quat
-        theta1 = np.arccos(x1 / np.sqrt(x4 ** 2 + x3 ** 2 + x2 ** 2 + x1 ** 2))
-        theta2 = np.arccos(x2 / np.sqrt(x4 ** 2 + x3 ** 2 + x2 ** 2))
-        theta3 = np.arccos(x3 / np.sqrt(x4 ** 2 + x3 ** 2))
+        theta1 = np.arccos(x1 / np.sqrt(x4**2 + x3**2 + x2**2 + x1**2))
+        theta2 = np.arccos(x2 / np.sqrt(x4**2 + x3**2 + x2**2))
+        theta3 = np.arccos(x3 / np.sqrt(x4**2 + x3**2))
         if x4 < 0:
             theta3 = 2 * np.pi - theta3
         thetas = np.hstack([theta1, theta2, theta3])
         return thetas
+
+
+class ManiskillEnv(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        wrapped_space = self.env.observation_space
+        self.state_space = gym.spaces.Dict(
+            {"agent": wrapped_space["agent"], "extra": wrapped_space["extra"]}
+        )
+
+        n_cameras = len(wrapped_space["image"])
+        # assume cameras all have the same dimensions
+
+        height, width = next(iter(wrapped_space["image"].values()))["rgb"].shape[:2]
+
+        self.obs_space = {
+            "reward": gym.spaces.Box(-np.inf, np.inf, (), dtype=np.float32),
+            "is_first": gym.spaces.Box(0, 1, (), dtype=bool),
+            "is_last": gym.spaces.Box(0, 1, (), dtype=bool),
+            "is_terminal": gym.spaces.Box(0, 1, (), dtype=bool),
+            "success": gym.spaces.Box(0, 1, (), dtype=bool),
+            "state": gym.spaces.flatten_space(self.state_space),
+            "image": gym.spaces.Box(
+                0, 255, (height, width * n_cameras, 3), dtype=np.uint8
+            ),
+        }
+
+    @property
+    def act_space(self):
+        action = self.env.action_space
+        return {"action": action}
+
+    def observation(self, observation: dict) -> dict:
+        state = gym.spaces.flatten(
+            self.state_space,
+            {"agent": observation["agent"], "extra": observation["extra"]},
+        )
+        new_obs = {"state": state}
+        for cam_name, cam_data in observation["image"].items():
+            new_obs[cam_name] = np.concatenate(
+                (cam_data["rgb"], cam_data["depth"]), axis=-1
+            )
+        return new_obs
+
+    def step(self, action) -> dict:
+        observation, reward, terminated, truncated, info = self.env.step(
+            action["action"]
+        )
+        new_obs = self.observation(observation)
+        new_obs |= {
+            "reward": reward,
+            "is_first": False,
+            "is_last": terminated or truncated,
+            "is_terminal": terminated,
+            "success": info["success"],
+        }
+        return new_obs
+
+    def reset(self):
+        observation, info = self.env.reset()
+        new_obs = self.observation(observation)
+        new_obs |= {
+            "reward": 0.0,
+            "is_first": True,
+            "is_last": False,
+            "is_terminal": False,
+            "success": False,
+        }
+        return new_obs
 
 
 class TimeLimit:

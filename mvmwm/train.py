@@ -8,6 +8,11 @@ import re
 import sys
 import warnings
 import pickle
+
+import gymnasium as gym
+from hydra import compose, initialize
+from omegaconf import OmegaConf
+from pc_rl.envs.wrappers.continuous_task_wrapper import ContinuousTaskWrapper
 from tqdm import tqdm
 
 try:
@@ -122,38 +127,44 @@ def main():
 
     ###### [4] Create Environment ######
     # 4-1. Create Env Factory
+    with initialize(version_base=None, config_path="../conf/env"):
+        # use value of task defined on command line to load hydra config
+        # TODO override env resolution with config from this script
+        env_cfg = compose(config_name=config.task)
+        env_cfg = OmegaConf.to_container(env_cfg, resolve=True, throw_on_missing=True)
+
     def make_env(mode, actions_min_max=None):
-        camera_keys = common.get_camera_keys(config.camera_keys)
-        suite, task = config.task.split("_", 1)
+        assert actions_min_max is None
 
-        all_add_cams = dict()
-        all_add_cams.update(additional_cams)
-        if mode == "eval":
-            # Add additional eval cameras, if they exist
-            all_add_cams.update(eval_cams)
+        import mani_skill2.envs  # to register maniskill envs
 
-        env_cls = common.RLBench
-        env = env_cls(
-            task,
-            camera_keys,
-            config.render_size,
-            shaped_rewards=config.shaped_rewards,
-            use_rotation=config.use_rotation,
-            additional_camera=additional_camera,
-            add_cam_names=all_add_cams,
-            randomize_texture=config.use_randomize,
-            default_texture=config.default_texture,
+        # to register modified envs
+        import pc_rl.envs.maniskill2.open_cabinet_door_drawer
+        import pc_rl.envs.maniskill2.pick_cube
+        import pc_rl.envs.maniskill2.push_chair
+        import pc_rl.envs.maniskill2.turn_faucet
+
+        env_kwargs = env_cfg.get("env_kwargs", {})
+        env = gym.make(
+            env_cfg["env_id"],
+            obs_mode="rgbd",
+            **env_kwargs,
         )
-        if actions_min_max:
-            env.register_min_max(actions_min_max)
 
-        env = common.TimeLimit(env, config.time_limit)
+        # Environments are deterministic (always the same seed) unless explicitly seeded
+        env.reset(seed=np.random.randint(1e9))
+
+        if env_cfg.get("continuous_task", False):
+            env = ContinuousTaskWrapper(env)
+
+        env = common.ManiskillEnv(env)
+
         return env
 
     # 4-2. RLBench demonstration collection
     dev_env = make_env("train")
     if config.num_demos != 0:
-        collect_fn = common.collect_demo
+        collect_fn = common.prefill_replay_buffer
         actions_min_max = collect_fn(
             dev_env,
             train_replay,
@@ -365,7 +376,7 @@ def per_episode(ep, step, config, logger, should, replay, mode, prefix=""):
             logger.scalar(f"max_{prefix}{mode}_{key}", ep[key].max(0).mean())
 
     if should(step):
-        cam_name = prefix.split("_")[0].split("|")[0]
+        cam_name = prefix.split("|")[0]
         if mode != "train":
             # Because we're randomizing the camera, it's a bit difficult
             # to log videos of training episodes.
