@@ -10,3 +10,6 @@ data
 
 # python editable installs
 *.egg-info/
+
+# log folder for slurm jobs
+slurm

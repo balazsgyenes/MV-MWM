@@ -9,17 +9,18 @@ Multi-View Masked World Models (MV-MWM) is a reinforcement learning framework th
 
 ## Instructions
 
-Install dependencies
+Create and activate mamba environment:
 ```
-source dependency.sh
+mamba env create -p .env -f env.yaml
+mamba activate ./.env
 ```
 
-First install dependencies from [RLBench](https://github.com/stepjam/RLBench) repository. Then, install our customized RLBench in `rlbench_shaped_rewards` directory. 
+Install pc_rl (for maniskill2 environments):
+```
+pip install -e PATH/TO/PC_RL
+```
 
-```
-cd ./rlbench_shaped_rewards
-pip install -e .
-```
+There is no need to download the assets again, if they are already downloaded in pc_rl.
 
 ## Experiments
 
