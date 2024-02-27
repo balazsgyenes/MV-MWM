@@ -54,13 +54,30 @@ def main():
     config.save(logdir / "config.yaml")
 
     with initialize(version_base=None, config_path="../conf"):
-        # use value of task defined on command line to override env config
-        pcrl_cfg = compose(config_name="train", overrides=[f"env={config.task}"])
+        pcrl_cfg = compose(
+            config_name="train",
+            overrides=[
+                # use value of task defined on command line to override env config
+                f"env={config.task}",
+                # override render resolution in environment with config from MV-MWM
+                f"env.env_kwargs.camera_cfgs.width={config.render_size[0]}",
+                f"env.env_kwargs.camera_cfgs.height={config.render_size[1]}",
+            ],
+        )
         pcrl_cfg = OmegaConf.to_container(pcrl_cfg, resolve=True, throw_on_missing=True)
 
-    pcrl_cfg["model"] = {"name": "MV-MWM"}
-    wandb_cfg = pcrl_cfg.pop("wandb")
+    pcrl_cfg["model"] = {"name": "MV-MWM"}  # add model.name as in pc_rl
+    wandb_cfg = pcrl_cfg.pop("wandb")  # don't log wandb config to wandb
     env_cfg = pcrl_cfg["env"]
+
+    # update camera_keys and control_input in MV-MWM config according to environment
+    config = config.update(
+        {
+            "camera_keys": "|".join(env_cfg["camera_names"]),
+            "control_input": "|".join(env_cfg["camera_names"]),
+        }
+    )
+
     wandb.init(
         project="MV-MWM",
         config=pcrl_cfg,

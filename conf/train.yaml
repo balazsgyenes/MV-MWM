@@ -1,5 +1,6 @@
 defaults:
   - env: "???"
+  - _self_
 
 wandb:
   notes: null
