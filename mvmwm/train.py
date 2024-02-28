@@ -217,6 +217,13 @@ def main():
             actions_min_max = pickle.load(f)
         print("load actions_min_max: ", actions_min_max)
 
+    # update size of state prediction head in model based on env obs space
+    config = config.update(
+        {
+            "state_head.shape": dev_env.obs_space["state"].shape,
+        }
+    )
+
     del dev_env
     gc.collect()
 
