@@ -197,6 +197,7 @@ def main():
         config = config.update(
             {
                 "state_head.shape": dev_env.obs_space["state"].shape,
+                "grad_heads": config.grad_heads + ("state",),
             }
         )
 

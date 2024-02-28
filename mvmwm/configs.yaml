@@ -70,7 +70,7 @@ defaults:
 
   # World Model
   clip_rewards: identity
-  grad_heads: [reward, discount, state]
+  grad_heads: [reward, discount]
   pred_discount: True
   rssm: {action_free: False, hidden: 1024, deter: 1024, stoch: 32, discrete: 32, act: elu, norm: none, std_act: sigmoid2, min_std: 0.1}
   reward_head: {layers: [512, 512, 512, 512], act: elu, norm: none, dist: symlog}

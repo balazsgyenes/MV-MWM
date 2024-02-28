@@ -503,7 +503,7 @@ class SofaEnv(gym.Wrapper):
             "is_first": False,
             "is_last": terminated or truncated,
             "is_terminal": terminated,
-            "success": info["success"],
+            "success": info["successful_task"],
         }
         return new_obs
 
