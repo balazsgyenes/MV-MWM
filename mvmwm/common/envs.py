@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import atexit
 import os
 import copy
@@ -6,6 +8,7 @@ import sys
 import threading
 import traceback
 import signal
+from typing import Sequence, Literal
 
 import cloudpickle
 from functools import partial
@@ -436,6 +439,229 @@ class ManiskillEnv(gym.Wrapper):
             "success": False,
         }
         return new_obs
+
+
+def build_maniskill(env_id, env_kwargs=None, continuous_task=False, **kwargs):
+    import mani_skill2.envs  # to register maniskill envs
+
+    # to register modified envs
+    import pc_rl.envs.maniskill2.open_cabinet_door_drawer
+    import pc_rl.envs.maniskill2.pick_cube
+    import pc_rl.envs.maniskill2.push_chair
+    import pc_rl.envs.maniskill2.turn_faucet
+    from pc_rl.envs.wrappers.continuous_task_wrapper import ContinuousTaskWrapper
+
+    env_kwargs = env_kwargs if env_kwargs is not None else {}
+    env = gym.make(
+        env_id,
+        obs_mode="rgbd",
+        **env_kwargs,
+    )
+
+    # Environments are deterministic (always the same seed) unless explicitly seeded
+    env.reset(seed=np.random.randint(1e9))
+
+    if continuous_task:
+        env = ContinuousTaskWrapper(env)
+
+    env = ManiskillEnv(env)
+
+    return env
+
+
+class SofaEnv(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        height, width = self.env.observation_space.shape[:2]
+        self.obs_space = {
+            "reward": gym.spaces.Box(-np.inf, np.inf, (), dtype=np.float32),
+            "is_first": gym.spaces.Box(0, 1, (), dtype=bool),
+            "is_last": gym.spaces.Box(0, 1, (), dtype=bool),
+            "is_terminal": gym.spaces.Box(0, 1, (), dtype=bool),
+            "success": gym.spaces.Box(0, 1, (), dtype=bool),
+            "image": gym.spaces.Box(
+                0, 255, (height, width, 3), dtype=np.uint8
+            ),
+        }
+
+    @property
+    def act_space(self):
+        action = self.env.action_space
+        return {"action": action}
+
+    def observation(self, observation: dict) -> dict:
+        return {"laparoscope": observation}
+
+    def step(self, action) -> dict:
+        observation, reward, terminated, truncated, info = self.env.step(
+            action["action"]
+        )
+        new_obs = self.observation(observation)
+        new_obs |= {
+            "reward": reward,
+            "is_first": False,
+            "is_last": terminated or truncated,
+            "is_terminal": terminated,
+            "success": info["success"],
+        }
+        return new_obs
+
+    def reset(self):
+        observation, info = self.env.reset()
+        new_obs = self.observation(observation)
+        new_obs |= {
+            "reward": 0.0,
+            "is_first": True,
+            "is_last": False,
+            "is_terminal": False,
+            "success": False,
+        }
+        return new_obs
+
+
+def build_thread_in_hole(
+    max_episode_steps: int,
+    render_mode: Literal["headless", "human"],
+    action_type: Literal["discrete", "continuous"],
+    observation_type: Literal["pointcloud", "rgb", "rgbd"],
+    image_shape: list[int],
+    frame_skip: int,
+    time_step: float,
+    insertion_ratio_threshold: float,
+    settle_steps: int,
+    simple_success_check: bool,
+    camera_reset_noise: list | None,
+    hole_rotation_reset_noise: list | None,
+    hole_position_reset_noise: list | None,
+    reward_amount_dict: dict,
+    create_scene_kwargs: dict | None = None,
+    add_rendering_to_info: bool = False,
+    **kwargs,
+) -> gym.Env:
+    from sofa_env.scenes.thread_in_hole.thread_in_hole_env import (
+        ActionType,
+        ObservationType,
+        RenderMode,
+        ThreadInHoleEnv,
+    )
+
+    image_shape = tuple(image_shape)  # type: ignore
+    render_mode = RenderMode[render_mode.upper()]  # type: ignore
+    action_type = ActionType[action_type.upper()]  # type: ignore
+
+    if camera_reset_noise is not None:
+        camera_reset_noise = np.asarray(camera_reset_noise)
+    if hole_rotation_reset_noise is not None:
+        hole_rotation_reset_noise = np.asarray(hole_rotation_reset_noise)
+    if hole_position_reset_noise is not None:
+        hole_position_reset_noise = np.asarray(hole_position_reset_noise)
+
+    if observation_type in ("pointcloud", "rgb"):
+        obs_type = ObservationType.RGB
+    elif observation_type == "rgbd":
+        obs_type = ObservationType.RGBD
+    else:
+        raise ValueError(f"Invalid observation type: {observation_type}")
+
+    if create_scene_kwargs is not None:
+        convert_to_array(create_scene_kwargs)
+
+    env = ThreadInHoleEnv(
+        observation_type=obs_type,
+        render_mode=render_mode,
+        action_type=action_type,
+        image_shape=image_shape,
+        frame_skip=frame_skip,
+        time_step=time_step,
+        settle_steps=settle_steps,
+        create_scene_kwargs=create_scene_kwargs,
+        reward_amount_dict=reward_amount_dict,
+        camera_reset_noise=camera_reset_noise,
+        hole_rotation_reset_noise=hole_rotation_reset_noise,
+        hole_position_reset_noise=hole_position_reset_noise,
+        insertion_ratio_threshold=insertion_ratio_threshold,
+        simple_success_check=simple_success_check,
+    )
+    env = gym.wrappers.TimeLimit(env, max_episode_steps)
+
+    env = SofaEnv(env)
+
+    return env
+
+
+def build_deflect_spheres(
+    max_episode_steps: int,
+    render_mode: Literal["headless", "human"],
+    action_type: Literal["discrete", "continuous"],
+    observation_type: Literal["pointcloud", "rgb", "rgbd"],
+    image_shape: Sequence[int],
+    frame_skip: int,
+    time_step: float,
+    settle_steps: int,
+    reward_amount_dict: dict,
+    single_agent: bool,
+    num_objects: int,
+    num_deflect_to_win: int,
+    min_deflection_distance: float,
+    create_scene_kwargs: dict | None = None,
+    camera_reset_noise: list | None = None,
+    add_rendering_to_info: bool = False,
+    **kwargs,
+) -> gym.Env:
+    from sofa_env.scenes.deflect_spheres.deflect_spheres_env import (
+        ActionType,
+        DeflectSpheresEnv,
+        ObservationType,
+        RenderMode,
+    )
+
+    image_shape = tuple(image_shape)  # type: ignore
+    render_mode = RenderMode[render_mode.upper()]  # type: ignore
+    action_type = ActionType[action_type.upper()]  # type: ignore
+
+    if camera_reset_noise is not None:
+        camera_reset_noise = np.asarray(camera_reset_noise)
+
+    if observation_type in ("pointcloud", "rgb"):
+        obs_type = ObservationType.RGB
+    elif observation_type == "rgbd":
+        obs_type = ObservationType.RGBD
+    else:
+        raise ValueError(f"Invalid observation type: {observation_type}")
+
+    if create_scene_kwargs is not None:
+        convert_to_array(create_scene_kwargs)
+
+    env = DeflectSpheresEnv(
+        observation_type=obs_type,
+        render_mode=render_mode,
+        action_type=action_type,
+        image_shape=image_shape,
+        frame_skip=frame_skip,
+        time_step=time_step,
+        settle_steps=settle_steps,
+        single_agent=single_agent,
+        num_objects=num_objects,
+        num_deflect_to_win=num_deflect_to_win,
+        min_deflection_distance=min_deflection_distance,
+        create_scene_kwargs=create_scene_kwargs,
+        reward_amount_dict=reward_amount_dict,
+        camera_reset_noise=camera_reset_noise,
+    )
+    env = gym.wrappers.TimeLimit(env, max_episode_steps)
+
+    env = SofaEnv(env)
+
+    return env
+
+
+def convert_to_array(kwargs_dict):
+    for k, v in kwargs_dict.items():
+        if isinstance(v, list):
+            kwargs_dict[k] = np.asarray(v)
+        elif isinstance(v, dict):
+            convert_to_array(v)
 
 
 class TimeLimit:

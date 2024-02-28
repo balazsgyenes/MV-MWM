@@ -2,8 +2,8 @@ env_kwargs:
   reward_mode: normalized_dense
   camera_cfgs:
     # converting an image at default resolution to a pointcloud is extremely expensive and wasteful
-    width: 128
-    height: 128
+    width: ${...image_shape[1]}
+    height: ${...image_shape[0]}
   renderer_kwargs:
     offscreen_only: True
     # if EGL_DEVICE_ID is set (e.g. by clusterduck for rendering resource),

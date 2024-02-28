@@ -1,0 +1,3 @@
+obs_has_state: False
+agent:
+  _target_: agent.Agent

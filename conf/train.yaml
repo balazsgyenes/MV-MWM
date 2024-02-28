@@ -1,6 +1,7 @@
 defaults:
   - env: "???"
   - _self_
+  - optional envXalgo@_global_: mvmwm_${env}
 
 wandb:
   notes: null

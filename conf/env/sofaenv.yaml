@@ -1,6 +1,6 @@
 # env args
 action_type: continuous
-observation_type: pointcloud
+observation_type: rgbd
 render_mode: headless
 image_shape: [128, 128]
 time_step: 0.1
@@ -8,3 +8,4 @@ frame_skip: 1
 max_episode_steps: 500
 
 traj_info: pc_rl.traj_info.SofaTrajInfo
+camera_names: [laparoscope]

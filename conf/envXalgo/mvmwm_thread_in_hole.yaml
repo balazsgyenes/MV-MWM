@@ -1,0 +1,5 @@
+defaults:
+  - mvmwm_sofaenv
+
+env:
+  _target_: common.build_thread_in_hole

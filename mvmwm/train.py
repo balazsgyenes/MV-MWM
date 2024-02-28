@@ -11,8 +11,8 @@ import pickle
 
 import gymnasium as gym
 from hydra import compose, initialize
-from omegaconf import OmegaConf
-from pc_rl.envs.wrappers.continuous_task_wrapper import ContinuousTaskWrapper
+from hydra.utils import get_class, instantiate
+from omegaconf import OmegaConf, open_dict
 from tqdm import tqdm
 import wandb
 
@@ -60,15 +60,14 @@ def main():
                 # use value of task defined on command line to override env config
                 f"env={config.task}",
                 # override render resolution in environment with config from MV-MWM
-                f"env.env_kwargs.camera_cfgs.width={config.render_size[0]}",
-                f"env.env_kwargs.camera_cfgs.height={config.render_size[1]}",
+                f"++env.image_shape={list(config.render_size)}",
             ],
         )
-        pcrl_cfg = OmegaConf.to_container(pcrl_cfg, resolve=True, throw_on_missing=True)
 
-    pcrl_cfg["model"] = {"name": "MV-MWM"}  # add model.name as in pc_rl
-    wandb_cfg = pcrl_cfg.pop("wandb")  # don't log wandb config to wandb
-    env_cfg = pcrl_cfg["env"]
+    with open_dict(pcrl_cfg):
+        pcrl_cfg["model"] = {"name": "MV-MWM"}  # add model.name as in pc_rl
+        wandb_cfg = pcrl_cfg.pop("wandb")  # don't log wandb config to wandb
+        env_cfg = pcrl_cfg.env
 
     # update camera_keys and control_input in MV-MWM config according to environment
     config = config.update(
@@ -80,12 +79,12 @@ def main():
 
     wandb.init(
         project="MV-MWM",
-        config=pcrl_cfg,
+        config=OmegaConf.to_container(pcrl_cfg, resolve=True, throw_on_missing=True),
         sync_tensorboard=True,  # auto-upload any values logged to tensorboard
         save_code=True,  # save script used to start training, git commit, and patch
         reinit=True,  # required for hydra sweeps with default launcher
-        tags=wandb_cfg["tags"],
-        notes=wandb_cfg["notes"],
+        tags=wandb_cfg.tags,
+        notes=wandb_cfg.notes,
     )
 
     print(config, "\n")
@@ -165,31 +164,7 @@ def main():
     # 4-1. Create Env Factory
     def make_env(mode, actions_min_max=None):
         assert actions_min_max is None
-
-        import mani_skill2.envs  # to register maniskill envs
-
-        # to register modified envs
-        import pc_rl.envs.maniskill2.open_cabinet_door_drawer
-        import pc_rl.envs.maniskill2.pick_cube
-        import pc_rl.envs.maniskill2.push_chair
-        import pc_rl.envs.maniskill2.turn_faucet
-
-        env_kwargs = env_cfg.get("env_kwargs", {})
-        env = gym.make(
-            env_cfg["env_id"],
-            obs_mode="rgbd",
-            **env_kwargs,
-        )
-
-        # Environments are deterministic (always the same seed) unless explicitly seeded
-        env.reset(seed=np.random.randint(1e9))
-
-        if env_cfg.get("continuous_task", False):
-            env = ContinuousTaskWrapper(env)
-
-        env = common.ManiskillEnv(env)
-
-        return env
+        return instantiate(env_cfg, _convert_="partial")
 
     # 4-2. RLBench demonstration collection
     dev_env = make_env("train")
@@ -217,12 +192,13 @@ def main():
             actions_min_max = pickle.load(f)
         print("load actions_min_max: ", actions_min_max)
 
-    # update size of state prediction head in model based on env obs space
-    config = config.update(
-        {
-            "state_head.shape": dev_env.obs_space["state"].shape,
-        }
-    )
+    if pcrl_cfg.obs_has_state:
+        # update size of state prediction head in model based on env obs space
+        config = config.update(
+            {
+                "state_head.shape": dev_env.obs_space["state"].shape,
+            }
+        )
 
     del dev_env
     gc.collect()
@@ -276,7 +252,8 @@ def main():
     report_dataset = iter(train_replay.dataset(**config.dataset))
 
     # 6-2. Set Agent / Policies
-    agnt = agent.Agent(config, obs_space, act_space, step)
+    AgentCls = get_class(pcrl_cfg.agent._target_)
+    agnt = AgentCls(config, obs_space, act_space, step)
     train_policy = lambda *args: agnt.policy(*args, mode="train")
     eval_policy = lambda *args: agnt.policy(*args, mode="eval")
 
