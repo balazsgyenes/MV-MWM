@@ -1,5 +1,3 @@
 obs_has_state: True
 agent:
   _target_: agent_with_state.AgentWithState
-env:
-  _target_: common.build_maniskill

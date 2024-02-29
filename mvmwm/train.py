@@ -85,6 +85,7 @@ def main():
         reinit=True,  # required for hydra sweeps with default launcher
         tags=wandb_cfg.tags,
         notes=wandb_cfg.notes,
+        mode="disabled" if wandb_cfg.disabled else None,
     )
 
     print(config, "\n")

@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 name: DeflectSpheres
-_target_: pc_rl.envs.sofaenv.deflect_spheres.build
+_target_: common.build_deflect_spheres
 
 # pointcloud wrapper args
 color: True

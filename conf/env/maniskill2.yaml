@@ -1,3 +1,4 @@
+_target_: common.build_maniskill
 env_kwargs:
   reward_mode: normalized_dense
   camera_cfgs:

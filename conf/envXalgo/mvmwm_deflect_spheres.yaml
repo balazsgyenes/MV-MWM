@@ -1,5 +1,2 @@
 defaults:
   - mvmwm_sofaenv
-
-env:
-  _target_: common.build_deflect_spheres

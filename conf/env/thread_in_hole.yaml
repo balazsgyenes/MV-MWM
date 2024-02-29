@@ -3,14 +3,12 @@ defaults:
   - _self_
 
 name: ThreadInHole
-_target_: pc_rl.envs.sofaenv.thread_in_hole.build
+_target_: common.build_thread_in_hole
 
 # pointcloud wrapper args
-max_expected_num_points: 600
+max_expected_num_points: 1000
 voxel_grid_size: 5.0
-random_downsample: 600
-center: [0.0, 0.0, 175.0]
-scale: 75
+normalize: True  # agent doesn't learn without this!
 
 # env args
 time_step: 0.01
