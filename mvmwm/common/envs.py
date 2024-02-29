@@ -393,9 +393,12 @@ class ManiskillEnv(gym.Wrapper):
             "success": gym.spaces.Box(0, 1, (), dtype=bool),
             "state": gym.spaces.flatten_space(self.state_space),
             "image": gym.spaces.Box(
-                0, 255, (height, width * n_cameras, 3), dtype=np.uint8
+                0, 255, (height, width * n_cameras, 4), dtype=np.float32
             ),
         }
+
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
+        self.imagenet_std = np.array([0.229, 0.224, 0.225])
 
     @property
     def act_space(self):
@@ -409,9 +412,12 @@ class ManiskillEnv(gym.Wrapper):
         )
         new_obs = {"state": state}
         for cam_name, cam_data in observation["image"].items():
-            new_obs[cam_name] = np.concatenate(
-                (cam_data["rgb"], cam_data["depth"]), axis=-1
-            )
+            rgb = cam_data["rgb"]
+            # normalize rgb like in mvmwm/agent.py:standardize
+            # this also bypasses their normalization, which expects 3 channels
+            rgb = (rgb / 255.0 - self.imagenet_mean) / self.imagenet_std
+            depth = cam_data["depth"]
+            new_obs[cam_name] = np.concatenate((rgb, depth), axis=-1)
         return new_obs
 
     def step(self, action) -> dict:
@@ -480,18 +486,25 @@ class SofaEnv(gym.Wrapper):
             "is_last": gym.spaces.Box(0, 1, (), dtype=bool),
             "is_terminal": gym.spaces.Box(0, 1, (), dtype=bool),
             "success": gym.spaces.Box(0, 1, (), dtype=bool),
-            "image": gym.spaces.Box(
-                0, 255, (height, width, 3), dtype=np.uint8
-            ),
+            "image": gym.spaces.Box(0, 255, (height, width, 4), dtype=np.float32),
         }
+
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406])
+        self.imagenet_std = np.array([0.229, 0.224, 0.225])
 
     @property
     def act_space(self):
         action = self.env.action_space
         return {"action": action}
 
-    def observation(self, observation: dict) -> dict:
-        return {"laparoscope": observation}
+    def observation(self, observation: np.ndarray) -> dict:
+        rgb = observation
+        # normalize rgb like in mvmwm/agent.py:standardize
+        # this also bypasses their normalization, which expects 3 channels
+        rgb = (rgb / 255.0 - self.imagenet_mean) / self.imagenet_std
+        depth = self.env.unwrapped.get_depth_from_open_gl()
+        rgbd = np.concatenate((rgb, depth), axis=-1)
+        return {"laparoscope": rgbd}
 
     def step(self, action) -> dict:
         observation, reward, terminated, truncated, info = self.env.step(

@@ -1,6 +1,6 @@
 # env args
 action_type: continuous
-observation_type: rgbd
+observation_type: rgb
 render_mode: headless
 image_shape: [128, 128]
 time_step: 0.1

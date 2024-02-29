@@ -4,7 +4,6 @@ GPU=$3
 SEED=$4
 
 DISPLAY=:0.${GPU} TF_XLA_FLAGS=--tf_xla_auto_jit=2 CUDA_VISIBLE_DEVICES=${GPU} \
-EGL_DEVICE_ID=${GPU} \
 python mvmwm/train.py \
 --logdir ./logs/${TASK}/mvmwm_mv/$(date '+%Y-%m-%d/%H-%M-%S')/${SEED} \
 --task ${TASK} \
