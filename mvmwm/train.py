@@ -376,6 +376,7 @@ def main():
 
 # Helper function executed after episode ends
 def per_episode(ep, step, config, logger, should, replay, mode, prefix=""):
+    cam_name = prefix.split("|")[0]
     if prefix != "":
         prefix = prefix + "_"
 
@@ -397,7 +398,6 @@ def per_episode(ep, step, config, logger, should, replay, mode, prefix=""):
             logger.scalar(f"max_{prefix}{mode}_{key}", ep[key].max(0).mean())
 
     if should(step):
-        cam_name = prefix.split("|")[0]
         if mode != "train":
             # Because we're randomizing the camera, it's a bit difficult
             # to log videos of training episodes.
