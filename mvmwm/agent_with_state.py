@@ -442,6 +442,10 @@ class WorldModelWithState(common.Module):
                 value = value.astype(dtype)
             if value.dtype == tf.uint8:  # image
                 value = self.standardize(value.astype(dtype) / 255.0)
+                value = self.standardize(value.astype(dtype) / 255.0)
+                # concatenate depth channel
+                depth = obs[key + "_depth"].astype(dtype)
+                value = tf.concat((value, depth), axis=-1)
             obs[key] = value
         if self.config.clip_rewards in ["identity", "sign", "tanh"]:
             obs["reward"] = {

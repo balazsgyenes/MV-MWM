@@ -412,12 +412,10 @@ class ManiskillEnv(gym.Wrapper):
         )
         new_obs = {"state": state}
         for cam_name, cam_data in observation["image"].items():
-            rgb = cam_data["rgb"]
-            # normalize rgb like in mvmwm/agent.py:standardize
-            # this also bypasses their normalization, which expects 3 channels
-            rgb = (rgb / 255.0 - self.imagenet_mean) / self.imagenet_std
-            depth = cam_data["depth"]
-            new_obs[cam_name] = np.concatenate((rgb, depth), axis=-1)
+            assert cam_data["rgb"].dtype == np.uint8
+            assert cam_data["depth"].dtype == np.float32
+            new_obs[cam_name] = cam_data["rgb"]
+            new_obs[cam_name + "_depth"] = cam_data["depth"]
         return new_obs
 
     def step(self, action) -> dict:
@@ -499,12 +497,10 @@ class SofaEnv(gym.Wrapper):
 
     def observation(self, observation: np.ndarray) -> dict:
         rgb = observation
-        # normalize rgb like in mvmwm/agent.py:standardize
-        # this also bypasses their normalization, which expects 3 channels
-        rgb = (rgb / 255.0 - self.imagenet_mean) / self.imagenet_std
         depth = self.env.unwrapped.get_depth_from_open_gl()
-        rgbd = np.concatenate((rgb, depth), axis=-1)
-        return {"laparoscope": rgbd}
+        assert rgb.dtype == np.uint8
+        assert depth.dtype == np.float32
+        return {"laparoscope": rgb, "laparoscope_depth": depth}
 
     def step(self, action) -> dict:
         observation, reward, terminated, truncated, info = self.env.step(

@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import time
+import collections
 
 import numpy as np
 
@@ -19,7 +20,7 @@ class Logger:
         step = int(self._step) * self._multiplier
         for name, value in dict(mapping).items():
             name = f"{prefix}_{name}" if prefix else name
-            value = np.array(value)
+            value = np.asarray(value)
             if len(value.shape) not in (0, 2, 3, 4):
                 raise ValueError(
                     f"Shape {value.shape} for name '{name}' cannot be "
@@ -40,8 +41,17 @@ class Logger:
         fps and self.scalar("fps", self._compute_fps())
         if not self._metrics:
             return
+        
+        summaries = collections.defaultdict(list)
+        metrics = []
+        for steps, name, value in self._metrics:
+            summaries[name].append((steps, value))
+        for name, entries in summaries.items():
+            steps, values = zip(*entries)
+            metrics.append((max(steps), name, np.mean(values, axis=0)))
+        
         for output in self._outputs:
-            output(self._metrics)
+            output(metrics)
         self._metrics.clear()
 
     def _compute_fps(self):

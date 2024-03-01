@@ -56,6 +56,7 @@ def main():
     with initialize(version_base=None, config_path="../conf"):
         pcrl_cfg = compose(
             config_name="train",
+            # override hydra environment config based on MV-MWM config
             overrides=[
                 # use value of task defined on command line to override env config
                 f"env={config.task}",
@@ -69,11 +70,14 @@ def main():
         wandb_cfg = pcrl_cfg.pop("wandb")  # don't log wandb config to wandb
         env_cfg = pcrl_cfg.env
 
-    # update camera_keys and control_input in MV-MWM config according to environment
+    # update MV-MWM config according to environment
     config = config.update(
         {
-            "camera_keys": "|".join(env_cfg["camera_names"]),
-            "control_input": "|".join(env_cfg["camera_names"]),
+            # camera_keys and control_input are all cameras defined in the environment
+            "camera_keys": "|".join(env_cfg.camera_names),
+            "control_input": "|".join(env_cfg.camera_names),
+            # update environment-specific discount
+            "discount": pcrl_cfg["discount"]
         }
     )
 
@@ -357,6 +361,8 @@ def main():
                 episodes=config.eval_eps,
             )
 
+        logger.write()
+
         print("Start training.")
         train_driver(
             train_policy,
@@ -364,6 +370,8 @@ def main():
             steps=config.eval_every,
         )
         agnt.save(logdir / "variables.pkl")
+
+        logger.write()
 
     # 9-4. Close all envs after training ends
     for env in train_envs + eval_envs:
@@ -383,20 +391,22 @@ def per_episode(ep, step, config, logger, should, replay, mode, prefix=""):
 
     length = len(ep["reward"]) - 1
     score = float(ep["reward"].astype(np.float64).sum())
-    success = float(np.sum(ep["success"]) >= 1.0)
+    success = float(np.any(ep["success"]))
     print(
-        f"{mode.title()} episode has {float(success)} success, {length} steps and return {score:.1f}."
+        f"{mode.title()} episode has {success} success, {length} steps and return {score:.1f}."
     )
-    logger.scalar(f"{prefix}{mode}_success", float(success))
-    logger.scalar(f"{prefix}{mode}_return", score)
-    logger.scalar(f"{prefix}{mode}_length", length)
+    logger.add({
+        f"{prefix}{mode}_success": success,
+        f"{prefix}{mode}_return": score,
+        f"{prefix}{mode}_length": length,
+    })
     for key, value in ep.items():
         if re.match(config.log_keys_sum, key):
-            logger.scalar(f"sum_{prefix}{mode}_{key}", ep[key].sum())
+            logger.scalar(f"sum_{prefix}{mode}_{key}", value.sum())
         if re.match(config.log_keys_mean, key):
-            logger.scalar(f"mean_{prefix}{mode}_{key}", ep[key].mean())
+            logger.scalar(f"mean_{prefix}{mode}_{key}", value.mean())
         if re.match(config.log_keys_max, key):
-            logger.scalar(f"max_{prefix}{mode}_{key}", ep[key].max(0).mean())
+            logger.scalar(f"max_{prefix}{mode}_{key}", value.max(0).mean())
 
     if should(step):
         if mode != "train":
@@ -405,7 +415,6 @@ def per_episode(ep, step, config, logger, should, replay, mode, prefix=""):
             out_video = ep[cam_name]
             logger.video(f"{prefix}{mode}_policy_image", out_video)
     logger.add(replay.stats, prefix=mode)
-    logger.write()
 
 
 if __name__ == "__main__":
