@@ -25,20 +25,23 @@ def prefill_replay_buffer(
     transitions = []
     for _ in tqdm(range(num_demos)):
 
-        reset_obs = env.reset()
-        action = env.action_space.sample()
-        action[...] = 0
-        reset_obs["action"] = action
-        transitions.append(reset_obs)
-
-        done = False
-        while not done:
+        timeout = False
+        while not timeout:
+            reset_obs = env.reset()
             action = env.action_space.sample()
-            obs = env.step({"action": action})
-            done = obs["is_last"]
-            obs["action"] = action
-            obs["is_last"] = obs["is_terminal"] = False
-            transitions.append(obs)
+            action[...] = 0
+            reset_obs["action"] = action
+            transitions.append(reset_obs)
+
+            done = False
+            while not done:
+                action = env.action_space.sample()
+                obs = env.step({"action": action})
+                done = obs["is_last"]
+                timeout = obs["is_last"] and not obs["is_terminal"]
+                obs["action"] = action
+                obs["is_last"] = obs["is_terminal"] = False
+                transitions.append(obs)
 
         assert len(transitions) % 50 == 1
         transitions.pop()  # apparently this needs to have a multiple of 50 elements
