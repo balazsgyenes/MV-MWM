@@ -27,11 +27,12 @@ def prefill_replay_buffer(
 
         timeout = False
         while not timeout:
+            traj = []
             reset_obs = env.reset()
             action = env.action_space.sample()
             action[...] = 0
             reset_obs["action"] = action
-            transitions.append(reset_obs)
+            traj.append(reset_obs)
 
             done = False
             while not done:
@@ -41,11 +42,12 @@ def prefill_replay_buffer(
                 timeout = obs["is_last"] and not obs["is_terminal"]
                 obs["action"] = action
                 obs["is_last"] = obs["is_terminal"] = False
-                transitions.append(obs)
+                traj.append(obs)
 
-        assert len(transitions) % 50 == 1
-        transitions.pop()  # apparently this needs to have a multiple of 50 elements
-        transitions[-1]["is_last"] = True
+        assert len(traj) % 50 == 1
+        traj.pop()  # apparently this needs to have a multiple of 50 elements
+        traj[-1]["is_last"] = True
+        transitions.extend(traj)
 
     for obs in transitions:
         replay.add_step(obs)
